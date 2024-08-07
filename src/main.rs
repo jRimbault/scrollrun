@@ -7,10 +7,16 @@ use std::{
 };
 
 /// Run a command and display its output in a scrolling window.
-/// Doesn't particularly work well with outputs with lots of control characters.
+/// Doesn't particularly work well with commands outputing control characters.
 #[derive(Parser)]
+#[clap(
+    version,
+    author = clap::crate_authors!("\n"),
+    styles = styles(),
+    help_template = HELP,
+)]
 struct Opt {
-    /// The command to run
+    /// The command to run. Will be run through a shell.
     command: String,
     /// Number of lines to display at a time
     #[clap(short, long, default_value = "10")]
@@ -158,4 +164,24 @@ mod consumer {
     impl MarkedReader for std::process::ChildStderr {
         const MARKER: Source = Source::Stderr;
     }
+}
+
+const HELP: &str = "\
+{before-help}
+{usage-heading} {usage}
+
+{about}
+
+{all-args}{after-help}
+
+{name} {version} {author-with-newline}
+";
+
+fn styles() -> clap::builder::Styles {
+    use clap::builder::styling::AnsiColor;
+    clap::builder::Styles::styled()
+        .usage(AnsiColor::Green.on_default())
+        .header(AnsiColor::Yellow.on_default())
+        .literal(AnsiColor::Green.on_default())
+        .placeholder(AnsiColor::Green.on_default())
 }
