@@ -1,0 +1,11 @@
+[package]
+name = "scrollrun"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.13", features = ["derive"] }
+indicatif = "0.17.8"
