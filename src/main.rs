@@ -1,9 +1,14 @@
+#![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
 use clap::Parser;
 use std::{
+    collections::VecDeque,
+    fmt,
+    io::{BufRead, BufReader, IsTerminal},
     process::{Command, ExitCode, Stdio},
     sync::mpsc::{self},
     thread,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 /// Run a command and display its output in a scrolling window.
@@ -17,152 +22,135 @@ use std::{
 )]
 struct Opt {
     /// The command to run. Will be run through a shell.
-    command: String,
+    command: Option<String>,
     /// Number of lines to display at a time
-    #[clap(short, long, default_value = "10")]
-    num_lines: usize,
+    #[clap(short, long)]
+    num_lines: Option<usize>,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Source {
-    Stdout,
-    Stderr,
-}
+const DELAY: std::time::Duration = std::time::Duration::from_millis(100);
 
-fn clear() {
-    print!("\x1B[2J\x1B[H");
+impl Opt {
+    fn num_lines(&self) -> Option<usize> {
+        if let Some(i) = self.num_lines {
+            return Some(i);
+        }
+        termsize::get().map(|t| t.rows.saturating_sub(30).max(10) as usize)
+    }
 }
-
-const DELAY: Duration = Duration::from_millis(100);
 
 fn main() -> anyhow::Result<ExitCode> {
     let opt = Opt::parse();
-
-    let (tx, rx) = mpsc::channel();
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(&opt.command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
-    let stdout = consumer::Consumer::new(stdout, tx.clone());
-    let stderr = consumer::Consumer::new(stderr, tx.clone());
-
-    let start = Instant::now();
-    let mut output_lines = Vec::new();
-
-    loop {
-        while let Ok(line) = rx.try_recv() {
-            output_lines.push(line);
+    let num_lines = opt.num_lines().unwrap_or(10);
+    let code = thread::scope(|s| -> anyhow::Result<_> {
+        let (sender, receiver) = mpsc::channel();
+        if let Some(cmd) = &opt.command {
+            let mut child = Command::new("bash")
+                .arg("--norc")
+                .arg("-c")
+                .arg(cmd)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()?;
+            s.spawn({
+                let stdout = child.stdout.take().unwrap();
+                let sender = sender.clone();
+                move || read(stdout, sender)
+            });
+            let stdout = s.spawn({
+                let stderr = child.stderr.take().unwrap();
+                move || read(stderr, sender)
+            });
+            let stderr = s.spawn(move || print(receiver, num_lines));
+            let status = child.wait()?;
+            let _ = stdout.join();
+            let _ = stderr.join();
+            return Ok(status
+                .code()
+                .and_then(|i| u8::try_from(i).ok())
+                .map(ExitCode::from)
+                .unwrap_or(if status.success() {
+                    ExitCode::SUCCESS
+                } else {
+                    ExitCode::FAILURE
+                }));
         }
-
-        clear();
-        println!(
-            "· Elapsed time: {}",
-            indicatif::FormattedDuration(start.elapsed())
-        );
-        println!("╭─");
-        for (line, source) in output_lines.iter().rev().take(opt.num_lines).rev() {
-            match source {
-                Source::Stdout => println!("│ {line}"),
-                Source::Stderr => eprintln!("│ {line}"),
-            }
+        if !std::io::stdin().is_terminal() {
+            let stdin = s.spawn(move || read(std::io::stdin(), sender));
+            let h = s.spawn(move || print(receiver, num_lines));
+            let _ = stdin.join();
+            h.join()
+                .map_err(|_| anyhow::anyhow!("couldn't read from pipe"))?;
         }
-        println!("╰─");
+        Ok(ExitCode::SUCCESS)
+    })?;
+    Ok(code)
+}
 
-        if output_lines.len() > opt.num_lines {
-            output_lines.drain(..output_lines.len() - opt.num_lines);
+fn read<R>(reader: R, tx: mpsc::Sender<String>)
+where
+    R: std::io::Read,
+{
+    let stdout = BufReader::new(reader);
+    for line in stdout.lines() {
+        match line {
+            Ok(line) => tx.send(line).unwrap(),
+            Err(_) => break,
         }
-
-        if let Some(status) = child.try_wait()? {
-            if let Err(mpsc::RecvTimeoutError::Timeout) = rx.recv_timeout(DELAY) {
-                stdout.close()?;
-                stderr.close()?;
-                println!(
-                    "· Finished in: {}",
-                    indicatif::FormattedDuration(start.elapsed())
-                );
-                let code = status
-                    .code()
-                    .and_then(|i| u8::try_from(i).ok())
-                    .unwrap_or_else(|| if status.success() { 0 } else { 1 });
-                return Ok(ExitCode::from(code));
-            }
-        }
-
-        thread::sleep(DELAY);
     }
 }
 
-mod consumer {
-    use std::{
-        io::{BufRead, BufReader, Read},
-        sync::mpsc::Sender,
-        thread,
-    };
-
-    use crate::Source;
-
-    #[derive(Debug)]
-    pub struct Consumer {
-        handle: Option<thread::JoinHandle<()>>,
-    }
-
-    impl Consumer {
-        pub fn new<R>(reader: R, tx: Sender<(String, Source)>) -> Self
-        where
-            R: MarkedReader + 'static,
-        {
-            let reader = BufReader::new(reader);
-            let handle = thread::spawn(move || {
-                for line in reader.lines() {
-                    match line {
-                        Ok(line) => tx.send((line, R::MARKER)).unwrap(),
-                        Err(_) => break,
-                    }
+fn print(rx: mpsc::Receiver<String>, num_lines: usize) {
+    let start = Instant::now();
+    let mut output_lines = VecDeque::new();
+    let mut has_ended = false;
+    loop {
+        while let Ok(line) = rx.try_recv() {
+            output_lines.push_back(line);
+        }
+        print!("\x1B[2J\x1B[H"); // clear
+        println!("· Elapsed time: {}", Duration(start.elapsed()));
+        println!("╭─");
+        for line in output_lines.iter().take(num_lines) {
+            println!("│ {line}");
+        }
+        println!("╰─");
+        while output_lines.len() > num_lines {
+            output_lines.pop_front();
+        }
+        match rx.recv_timeout(DELAY) {
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                if has_ended {
+                    break;
                 }
-            });
-
-            Self {
-                handle: Some(handle),
+                has_ended = true;
             }
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+            Ok(line) => output_lines.push_back(line),
         }
-        pub fn close(mut self) -> anyhow::Result<()> {
-            if let Some(handle) = self.handle.take() {
-                handle
-                    .join()
-                    .map_err(|_| anyhow::anyhow!("couldn't join thread"))?;
-            }
-            Ok(())
+        thread::sleep(DELAY);
+    }
+    println!("· Finished in: {}", Duration(start.elapsed()));
+}
+
+#[derive(Debug)]
+struct Duration(std::time::Duration);
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut t = self.0.as_secs();
+        let seconds = t % 60;
+        t /= 60;
+        let minutes = t % 60;
+        t /= 60;
+        let hours = t % 24;
+        t /= 24;
+        if t > 0 {
+            let days = t;
+            write!(f, "{days}d {hours:02}:{minutes:02}:{seconds:02}")
+        } else {
+            write!(f, "{hours:02}:{minutes:02}:{seconds:02}")
         }
-    }
-
-    impl Drop for Consumer {
-        fn drop(&mut self) {
-            if let Some(handle) = self.handle.take() {
-                let _ = handle.join();
-            }
-        }
-    }
-
-    trait Sealed {}
-
-    #[allow(private_bounds)]
-    pub trait MarkedReader: Read + Send + Sized + Sealed {
-        const MARKER: Source;
-    }
-
-    impl Sealed for std::process::ChildStdout {}
-    impl Sealed for std::process::ChildStderr {}
-
-    impl MarkedReader for std::process::ChildStdout {
-        const MARKER: Source = Source::Stdout;
-    }
-
-    impl MarkedReader for std::process::ChildStderr {
-        const MARKER: Source = Source::Stderr;
     }
 }
 

@@ -41,7 +41,7 @@ Arguments:
   <COMMAND>  The command to run. Will be run through a shell.
 
 Options:
-  -n, --num-lines <NUM_LINES>  Number of lines to display at a time [default: 10]
+  -n, --num-lines <NUM_LINES>  Number of lines to display at a time
   -h, --help                   Print help (see more with '--help')
   -V, --version                Print version
 
@@ -53,5 +53,5 @@ scrollrun 0.1.0 jRimbault <jacques.rimbault@gmail.com>
 ## Install
 
 ```sh
-cargo install --locked https://github.com/jRimbault/scrollrun.git
+cargo install --locked --git https://github.com/jRimbault/scrollrun.git
 ```
