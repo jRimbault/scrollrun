@@ -28,7 +28,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-      - run: cargo check
+      - run: cargo check --all-features
 
   clippy:
     name: Clippy

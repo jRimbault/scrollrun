@@ -6,6 +6,11 @@ authors = ["jRimbault <jacques.rimbault@gmail.com>"]
 license = "MIT"
 rust-version = "1.74.1"
 
+[features]
+default = []
+more-warnings = []
+even-more-warnings = ["more-warnings"]
+
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["cargo", "derive", "wrap_help"] }
