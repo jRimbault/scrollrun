@@ -45,7 +45,7 @@ use std::{
 
 /// Run a command and display its output in a scrolling window.
 /// Doesn't particularly work well with commands outputing control characters.
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[clap(
     version,
     author = clap::crate_authors!("\n"),
@@ -62,18 +62,28 @@ struct Opt {
 
 impl Opt {
     fn num_lines(&self) -> Option<usize> {
+        static CALLED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+        static ROWS: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
         if let Some(i) = self.num_lines {
             return Some(i);
         }
-        let term = termsize::get()?;
-        let rows = term.rows.saturating_sub(30).max(10).min(term.rows);
+        let rows = if CALLED.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            let term = termsize::get()?;
+            ROWS.store(term.rows, std::sync::atomic::Ordering::SeqCst);
+            term.rows
+        } else {
+            ROWS.load(std::sync::atomic::Ordering::SeqCst)
+        };
+        if CALLED.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 10 {
+            CALLED.store(0, std::sync::atomic::Ordering::SeqCst);
+        }
+        let rows = rows.saturating_sub(20).max(10).min(rows);
         Some(rows.into())
     }
 }
 
 fn main() -> anyhow::Result<ExitCode> {
     let opt = Opt::parse();
-    let num_lines = opt.num_lines().unwrap_or(10);
     let code = thread::scope(|s| -> anyhow::Result<_> {
         let (sender, receiver) = mpsc::channel();
         if let Some(cmd) = &opt.command {
@@ -95,7 +105,7 @@ fn main() -> anyhow::Result<ExitCode> {
             });
             let stderr = s.spawn(move || {
                 let stdout = std::io::stdout();
-                print(stdout.lock(), receiver, num_lines);
+                print(stdout.lock(), receiver, opt);
             });
             let status = child.wait()?;
             let _ = stdout.join();
@@ -114,7 +124,7 @@ fn main() -> anyhow::Result<ExitCode> {
             let stdin = s.spawn(move || read(std::io::stdin(), sender));
             let h = s.spawn(move || {
                 let stdout = std::io::stdout();
-                print(stdout.lock(), receiver, num_lines)
+                print(stdout.lock(), receiver, opt)
             });
             let _ = stdin.join();
             h.join()
@@ -138,7 +148,7 @@ where
     }
 }
 
-fn print<W>(mut writer: W, rx: mpsc::Receiver<String>, num_lines: usize)
+fn print<W>(mut writer: W, rx: mpsc::Receiver<String>, opt: Opt)
 where
     W: std::io::Write,
 {
@@ -147,6 +157,7 @@ where
     let mut output_lines = VecDeque::new();
     let mut has_ended = false;
     loop {
+        let num_lines = opt.num_lines().unwrap_or(10);
         while let Ok(line) = rx.try_recv() {
             output_lines.push_back(line);
         }
@@ -218,7 +229,7 @@ fn styles() -> clap::builder::Styles {
 
 #[cfg(test)]
 mod test {
-    use super::{print, read, Format};
+    use super::{print, read, Format, Opt};
 
     use std::{io::Cursor, sync::mpsc, thread, time::Duration};
 
@@ -296,7 +307,14 @@ mod test {
         tx.send("Line 2".to_string()).unwrap();
         drop(tx);
 
-        print(&mut output, rx, 5);
+        print(
+            &mut output,
+            rx,
+            Opt {
+                command: None,
+                num_lines: Some(5),
+            },
+        );
 
         let output_str = String::from_utf8(output.into_inner()).unwrap();
         assert!(output_str.contains("Line 1"));
@@ -314,7 +332,14 @@ mod test {
         }
         drop(tx);
 
-        print(&mut output, rx, 5);
+        print(
+            &mut output,
+            rx,
+            Opt {
+                command: None,
+                num_lines: Some(5),
+            },
+        );
 
         let output_str = String::from_utf8(output.into_inner()).unwrap();
         for i in 1..10 {
@@ -334,7 +359,14 @@ mod test {
             tx.send("Line 2".to_string()).unwrap();
         });
 
-        print(&mut output, rx, 5);
+        print(
+            &mut output,
+            rx,
+            Opt {
+                command: None,
+                num_lines: Some(5),
+            },
+        );
 
         let output_str = String::from_utf8(output.into_inner()).unwrap();
         assert!(output_str.contains("Line 1"));
