@@ -35,7 +35,8 @@ Output:
 ```text
 Usage: scrollrun [OPTIONS] <COMMAND>
 
-Run a command and display its output in a scrolling window. Doesn't particularly work well with commands outputing control characters
+Run a command and display its output in a scrolling window.
+Doesn't particularly work well with commands outputing control characters
 
 Arguments:
   <COMMAND>  The command to run. Will be run through a shell.
