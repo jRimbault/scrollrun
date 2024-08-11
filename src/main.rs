@@ -62,23 +62,31 @@ struct Opt {
 
 impl Opt {
     fn num_lines(&self) -> Option<usize> {
-        static CALLED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
-        static ROWS: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
+        use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
+        static CALLED: AtomicU8 = AtomicU8::new(0);
+        static ROWS: AtomicU16 = AtomicU16::new(0);
         if let Some(i) = self.num_lines {
             return Some(i);
         }
-        let rows = if CALLED.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+        let rows = if CALLED.load(Ordering::Relaxed) == 0 {
             let term = termsize::get()?;
-            ROWS.store(term.rows, std::sync::atomic::Ordering::SeqCst);
+            ROWS.store(term.rows, Ordering::Relaxed);
             term.rows
         } else {
-            ROWS.load(std::sync::atomic::Ordering::SeqCst)
+            ROWS.load(Ordering::Relaxed)
         };
-        if CALLED.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 10 {
-            CALLED.store(0, std::sync::atomic::Ordering::SeqCst);
+        if CALLED.fetch_add(1, Ordering::Relaxed) == 10 {
+            CALLED.store(0, Ordering::Relaxed);
         }
-        let rows = rows.saturating_sub(20).max(10).min(rows);
-        Some(rows.into())
+        Some(num_lines_heuristic(rows).into())
+    }
+}
+
+fn num_lines_heuristic(rows: u16) -> u16 {
+    if rows < 11 {
+        rows.saturating_sub(4).max(1)
+    } else {
+        rows.saturating_sub((rows / 3).max(5)) // Subtract 1/3th or at least 5
     }
 }
 
@@ -162,6 +170,8 @@ where
             output_lines.push_back(line);
         }
         writeln!(writer, "\x1B[2J\x1B[H").unwrap(); // clear
+        #[cfg(debug_assertions)]
+        write!(writer, "num lines: {num_lines:?} ").unwrap();
         writeln!(writer, "· Elapsed time: {}", Format(start.elapsed())).unwrap();
         writeln!(writer, "╭─").unwrap();
         for line in output_lines.iter().take(num_lines) {
@@ -229,7 +239,9 @@ fn styles() -> clap::builder::Styles {
 
 #[cfg(test)]
 mod test {
-    use super::{print, read, Format, Opt};
+    use textplots::Plot;
+
+    use super::{num_lines_heuristic, print, read, Format, Opt};
 
     use std::{io::Cursor, sync::mpsc, thread, time::Duration};
 
@@ -414,5 +426,28 @@ mod test {
         let duration = Format(Duration::from_secs(86400)); // Exactly one day
         let formatted = format!("{}", duration);
         assert_eq!(formatted, "1d 00:00:00");
+    }
+
+    #[test]
+    fn heuristic_tests() {
+        let points: Vec<_> = (0..200).map(num_lines_heuristic).collect();
+        if let Some(term) = termsize::get() {
+            let plot: Vec<(f32, f32)> = points
+                .iter()
+                .enumerate()
+                .map(|(i, p)| (i as _, *p as _))
+                .collect();
+            println!("{:#?}", plot);
+            // should be a quasi linear function
+            textplots::Chart::new(term.cols as _, term.cols as _, 0., 200.)
+                .lineplot(&textplots::Shape::Lines(&plot))
+                .display();
+        }
+        // ensure that for every increase in terminal row size the window size
+        // is at least bigger or equal than for the previous terminal row size
+        // assert!(points.is_sorted());
+        for w in points.windows(2) {
+            assert!(w[0] <= w[1])
+        }
     }
 }
