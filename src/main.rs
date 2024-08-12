@@ -179,6 +179,7 @@ where
         }
         writeln!(writer, "╰─").unwrap();
         while output_lines.len() > num_lines {
+            has_ended = false;
             output_lines.pop_front();
         }
         match rx.recv_timeout(DELAY) {
