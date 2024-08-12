@@ -169,7 +169,7 @@ where
         while let Ok(line) = rx.try_recv() {
             output_lines.push_back(line);
         }
-        writeln!(writer, "\x1B[2J\x1B[H").unwrap(); // clear
+        write!(writer, "\x1B[2J\x1B[H").unwrap(); // clear
         #[cfg(debug_assertions)]
         write!(writer, "num lines: {num_lines:?} ").unwrap();
         writeln!(writer, "· Elapsed time: {}", Format(start.elapsed())).unwrap();
