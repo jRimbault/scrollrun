@@ -71,9 +71,9 @@ checksum = "102087e286b4677862ea56cf8fc58bb2cdfa8725c40ffb80fe3a008eb7f2fc83"
 
 [[package]]
 name = "clap"
-version = "4.5.13"
+version = "4.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fbb260a053428790f3de475e304ff84cdbc4face759ea7a3e64c1edd938a7fc"
+checksum = "11d8838454fda655dafd3accb2b6e2bea645b9e4078abe84a22ceb947235c5cc"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -81,15 +81,24 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.13"
+version = "4.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64b17d7ea74e9f833c7dbf2cbe4fb12ff26783eda4782a8975b72f895c9b4d99"
+checksum = "216aec2b177652e3846684cbfe25c9964d18ec45234f0f5da5157b207ed1aab6"
 dependencies = [
  "anstream",
  "anstyle",
  "clap_lex",
  "strsim",
  "terminal_size",
+]
+
+[[package]]
+name = "clap_complete"
+version = "4.5.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d11bff0290e9a266fc9b4ce6fa96c2bf2ca3f9724c41c10202ac1daf7a087f8"
+dependencies = [
+ "clap",
 ]
 
 [[package]]
@@ -228,6 +237,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "clap_complete",
  "termsize",
  "textplots",
 ]

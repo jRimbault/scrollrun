@@ -14,6 +14,7 @@ even-more-warnings = ["more-warnings"]
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["cargo", "derive", "wrap_help"] }
+clap_complete = "4.5.14"
 termsize = "0.1.9"
 
 [dev-dependencies]

@@ -32,7 +32,7 @@
     warn(missing_copy_implementations, missing_docs)
 )]
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use std::{
     collections::VecDeque,
     fmt,
@@ -54,10 +54,14 @@ use std::{
 )]
 struct Opt {
     /// The command to run. Will be run through a shell.
+    #[clap(value_hint = clap::ValueHint::CommandString)]
     command: Option<String>,
     /// Number of lines to display at a time
     #[clap(short, long)]
     num_lines: Option<usize>,
+    /// Print autocompletion script for your shell
+    #[arg(long = "generate", value_enum)]
+    generator: Option<clap_complete::Shell>,
 }
 
 impl Opt {
@@ -92,6 +96,9 @@ fn num_lines_heuristic(rows: u16) -> u16 {
 
 fn main() -> anyhow::Result<ExitCode> {
     let opt = Opt::parse();
+    if print_completions(opt.generator) {
+        return Ok(ExitCode::SUCCESS);
+    }
     let code = thread::scope(|s| -> anyhow::Result<_> {
         let (sender, receiver) = mpsc::channel();
         if let Some(cmd) = &opt.command {
@@ -238,6 +245,17 @@ fn styles() -> clap::builder::Styles {
         .placeholder(AnsiColor::Green.on_default())
 }
 
+fn print_completions(gen: Option<clap_complete::Shell>) -> bool {
+    if let Some(gen) = gen {
+        let mut cmd = Opt::command();
+        let name = env!("CARGO_BIN_NAME").to_owned();
+        clap_complete::generate(gen, &mut cmd, name, &mut std::io::stdout());
+        true
+    } else {
+        false
+    }
+}
+
 #[cfg(test)]
 mod test {
     use textplots::Plot;
@@ -326,6 +344,7 @@ mod test {
             Opt {
                 command: None,
                 num_lines: Some(5),
+                generator: None,
             },
         );
 
@@ -351,6 +370,7 @@ mod test {
             Opt {
                 command: None,
                 num_lines: Some(5),
+                generator: None,
             },
         );
 
@@ -378,6 +398,7 @@ mod test {
             Opt {
                 command: None,
                 num_lines: Some(5),
+                generator: None,
             },
         );
 
