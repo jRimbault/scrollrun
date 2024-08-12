@@ -2,6 +2,8 @@
 
 Display a command output in a fixed amount of lines with the elasped time.
 
+[![asciicast](https://asciinema.org/a/UkgxrRBITiFin9JPGHWe0W52y.svg)](https://asciinema.org/a/UkgxrRBITiFin9JPGHWe0W52y)
+
 ## Usage
 
 Example:
