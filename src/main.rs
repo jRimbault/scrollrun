@@ -15,7 +15,8 @@ use std::{
 /// Doesn't particularly work well with commands outputing control characters.
 #[derive(Debug, Parser)]
 #[clap(
-    version,
+    version = env!("PKG_VERSION"),
+    long_version = env!("PKG_LONG_VERSION"),
     author = clap::crate_authors!("\n"),
     styles = styles(),
     help_template = HELP,
