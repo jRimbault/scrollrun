@@ -18,7 +18,7 @@ use std::{
     version = env!("PKG_VERSION"),
     long_version = env!("PKG_LONG_VERSION"),
     author = clap::crate_authors!("\n"),
-    styles = styles(),
+    styles = clap_cargo::style::CLAP_STYLING,
     help_template = HELP,
 )]
 struct Opt {
@@ -204,15 +204,6 @@ const HELP: &str = "\
 
 {name} {version} {author-with-newline}
 ";
-
-fn styles() -> clap::builder::Styles {
-    use clap::builder::styling::AnsiColor;
-    clap::builder::Styles::styled()
-        .usage(AnsiColor::Green.on_default())
-        .header(AnsiColor::Yellow.on_default())
-        .literal(AnsiColor::Green.on_default())
-        .placeholder(AnsiColor::Green.on_default())
-}
 
 fn print_completions(gen: Option<clap_complete::Shell>) -> bool {
     if let Some(gen) = gen {

@@ -9,6 +9,7 @@ rust-version = "1.74.1"
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["cargo", "derive", "wrap_help"] }
+clap-cargo = { version = "0.14.1", features = ["clap"] }
 clap_complete = "4.5.14"
 termsize = "0.1.9"
 
@@ -22,7 +23,6 @@ unsafe_code = "forbid"
 ambiguous_glob_imports = "deny"
 ambiguous_glob_reexports = "deny"
 nonstandard_style = { level = "deny", priority = -1 }
-dead_code = "deny"
 improper_ctypes = "deny"
 missing_debug_implementations = "deny"
 no_mangle_generic_items = "deny"
