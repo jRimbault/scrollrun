@@ -6,11 +6,6 @@ authors = ["jRimbault <jacques.rimbault@gmail.com>"]
 license = "MIT"
 rust-version = "1.74.1"
 
-[features]
-default = []
-more-warnings = []
-even-more-warnings = ["more-warnings"]
-
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["cargo", "derive", "wrap_help"] }
@@ -19,3 +14,28 @@ termsize = "0.1.9"
 
 [dev-dependencies]
 textplots = "0.8.6"
+
+[lints.rust]
+# forbid
+unsafe_code = "forbid"
+# deny
+ambiguous_glob_imports = "deny"
+ambiguous_glob_reexports = "deny"
+nonstandard_style = { level = "deny", priority = -1 }
+dead_code = "deny"
+improper_ctypes = "deny"
+missing_debug_implementations = "deny"
+no_mangle_generic_items = "deny"
+non_shorthand_field_patterns = "deny"
+overflowing_literals = "deny"
+path_statements = "deny"
+patterns_in_fns_without_body = "deny"
+unconditional_recursion = "deny"
+unused = { level = "deny", priority = -1 }
+while_true = "deny"
+# warn
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+
+[lints.clippy]
+wildcard_imports = "deny"

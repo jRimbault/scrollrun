@@ -1,36 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![forbid(unsafe_code)]
-#![deny(
-    bad_style,
-    dead_code,
-    improper_ctypes,
-    missing_debug_implementations,
-    non_shorthand_field_patterns,
-    no_mangle_generic_items,
-    overflowing_literals,
-    path_statements,
-    patterns_in_fns_without_body,
-    unconditional_recursion,
-    unused,
-    unused_allocation,
-    unused_comparisons,
-    unused_parens,
-    while_true
-)]
-#![cfg_attr(
-    feature = "more-warnings",
-    warn(
-        trivial_casts,
-        trivial_numeric_casts,
-        unused_extern_crates,
-        unused_import_braces,
-        unused_qualifications,
-    )
-)]
-#![cfg_attr(
-    feature = "even-more-warnings",
-    warn(missing_copy_implementations, missing_docs)
-)]
 
 use clap::{CommandFactory, Parser};
 use std::{

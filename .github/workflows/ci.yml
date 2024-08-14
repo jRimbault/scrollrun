@@ -29,6 +29,8 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - run: cargo check --all-features
+        env:
+          RUSTFLAGS: -D warnings
 
   clippy:
     name: Clippy
