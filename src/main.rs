@@ -422,7 +422,7 @@ mod test {
     #[test]
     fn heuristic_tests() {
         let points: Vec<_> = (0..200).map(num_lines_heuristic).collect();
-        if let Some(term) = termsize::get() {
+        if let Some(term) = termsize::get().filter(|t| t.cols > 31 && t.rows > 2) {
             let plot: Vec<(f32, f32)> = points
                 .iter()
                 .enumerate()
