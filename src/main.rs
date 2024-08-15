@@ -51,16 +51,12 @@ impl Opt {
         if CALLED.fetch_add(1, Ordering::Relaxed) == 10 {
             CALLED.store(0, Ordering::Relaxed);
         }
-        Some(num_lines_heuristic(rows).into())
+        Some(num_lines_rules(rows).into())
     }
 }
 
-fn num_lines_heuristic(rows: u16) -> u16 {
-    if rows < 11 {
-        rows.saturating_sub(4).max(1)
-    } else {
-        rows.saturating_sub((rows / 3).max(5)) // Subtract 1/3th or at least 5
-    }
+fn num_lines_rules(rows: u16) -> u16 {
+    rows.saturating_sub((rows / 3).max(4)).max(1)
 }
 
 fn main() -> anyhow::Result<ExitCode> {
@@ -220,7 +216,7 @@ fn print_completions(gen: Option<clap_complete::Shell>) -> bool {
 mod test {
     use textplots::Plot;
 
-    use super::{num_lines_heuristic, print, read, Format, Opt};
+    use super::{num_lines_rules, print, read, Format, Opt};
 
     use std::{io::Cursor, sync::mpsc, thread, time::Duration};
 
@@ -411,8 +407,8 @@ mod test {
     }
 
     #[test]
-    fn heuristic_tests() {
-        let points: Vec<_> = (0..200).map(num_lines_heuristic).collect();
+    fn num_lines_rules_spec() {
+        let points: Vec<_> = (0..200).map(num_lines_rules).collect();
         if let Some(term) = termsize::get().filter(|t| t.cols > 31 && t.rows > 2) {
             let plot: Vec<(f32, f32)> = points
                 .iter()
@@ -425,6 +421,12 @@ mod test {
                 .lineplot(&textplots::Shape::Lines(&plot))
                 .display();
         }
+        // The decorations take 4 lines, so until the terminal has 6 rows available
+        // it should only display one line at time to save space
+        for p in &points[..6] {
+            assert_eq!(*p, 1);
+        }
+        assert_eq!(points[6], 2);
         // ensure that for every increase in terminal row size the window size
         // is at least bigger or equal than for the previous terminal row size
         // assert!(points.is_sorted());
