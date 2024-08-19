@@ -42,9 +42,9 @@ impl Opt {
             return Some(i);
         }
         let rows = if CALLED.load(Ordering::Relaxed) == 0 {
-            let term = termsize::get()?;
-            ROWS.store(term.rows, Ordering::Relaxed);
-            term.rows
+            let (_, terminal_size::Height(rows)) = terminal_size::terminal_size()?;
+            ROWS.store(rows, Ordering::Relaxed);
+            rows
         } else {
             ROWS.load(Ordering::Relaxed)
         };
@@ -409,7 +409,9 @@ mod test {
     #[test]
     fn num_lines_rules_spec() {
         let points: Vec<_> = (0..200).map(num_lines_rules).collect();
-        if let Some(term) = termsize::get().filter(|t| t.cols > 31 && t.rows > 2) {
+        if let Some((cols, _rows)) =
+            terminal_size::terminal_size().filter(|(cols, rows)| cols.0 > 31 && rows.0 > 2)
+        {
             let plot: Vec<(f32, f32)> = points
                 .iter()
                 .enumerate()
@@ -417,7 +419,7 @@ mod test {
                 .collect();
             println!("{:#?}", plot);
             // should be a quasi linear function
-            textplots::Chart::new(term.cols as _, term.cols as _, 0., 200.)
+            textplots::Chart::new(cols.0 as _, cols.0 as _, 0., 200.)
                 .lineplot(&textplots::Shape::Lines(&plot))
                 .display();
         }
