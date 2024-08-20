@@ -33,32 +33,6 @@ struct Opt {
     generator: Option<clap_complete::Shell>,
 }
 
-impl Opt {
-    fn num_lines(&self) -> Option<usize> {
-        use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
-        static CALLED: AtomicU8 = AtomicU8::new(0);
-        static ROWS: AtomicU16 = AtomicU16::new(0);
-        if let Some(i) = self.num_lines {
-            return Some(i);
-        }
-        let rows = if CALLED.load(Ordering::Relaxed) == 0 {
-            let (_, terminal_size::Height(rows)) = terminal_size::terminal_size()?;
-            ROWS.store(rows, Ordering::Relaxed);
-            rows
-        } else {
-            ROWS.load(Ordering::Relaxed)
-        };
-        if CALLED.fetch_add(1, Ordering::Relaxed) == 10 {
-            CALLED.store(0, Ordering::Relaxed);
-        }
-        Some(num_lines_rules(rows).into())
-    }
-}
-
-fn num_lines_rules(rows: u16) -> u16 {
-    rows.saturating_sub((rows / 3).max(4)).max(1)
-}
-
 fn main() -> anyhow::Result<ExitCode> {
     let opt = Opt::parse();
     if print_completions(opt.generator) {
@@ -113,6 +87,32 @@ fn main() -> anyhow::Result<ExitCode> {
         Ok(ExitCode::SUCCESS)
     })?;
     Ok(code)
+}
+
+impl Opt {
+    fn num_lines(&self) -> Option<usize> {
+        use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
+        static CALLED: AtomicU8 = AtomicU8::new(0);
+        static ROWS: AtomicU16 = AtomicU16::new(0);
+        if let Some(i) = self.num_lines {
+            return Some(i);
+        }
+        let rows = if CALLED.load(Ordering::Relaxed) == 0 {
+            let (_, terminal_size::Height(rows)) = terminal_size::terminal_size()?;
+            ROWS.store(rows, Ordering::Relaxed);
+            rows
+        } else {
+            ROWS.load(Ordering::Relaxed)
+        };
+        if CALLED.fetch_add(1, Ordering::Relaxed) == 10 {
+            CALLED.store(0, Ordering::Relaxed);
+        }
+        Some(num_lines_rules(rows).into())
+    }
+}
+
+fn num_lines_rules(rows: u16) -> u16 {
+    rows.saturating_sub((rows / 3).max(4)).max(1)
 }
 
 fn read<R>(reader: R, tx: mpsc::Sender<String>)
