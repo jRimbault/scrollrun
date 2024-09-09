@@ -13,7 +13,7 @@ use std::{
 
 /// Run a command and display its output in a scrolling window.
 /// Doesn't particularly work well with commands outputing control characters.
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 #[clap(
     version = env!("PKG_VERSION"),
     long_version = env!("PKG_LONG_VERSION"),
@@ -57,6 +57,7 @@ fn main() -> anyhow::Result<ExitCode> {
                 let stderr = child.stderr.take().unwrap();
                 move || read(stderr, sender)
             });
+            let cmd = cmd.clone();
             let stderr = s.spawn(move || {
                 let stdout = std::io::stdout();
                 print(stdout.lock(), receiver, opt);
@@ -64,6 +65,7 @@ fn main() -> anyhow::Result<ExitCode> {
             let status = child.wait()?;
             let _ = stdout.join();
             let _ = stderr.join();
+            println!("  Command: {cmd:?}");
             return Ok(status
                 .code()
                 .and_then(|i| u8::try_from(i).ok())
