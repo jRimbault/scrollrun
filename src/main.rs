@@ -31,6 +31,9 @@ struct Opt {
     /// Print autocompletion script for your shell
     #[arg(long = "generate", value_enum)]
     generator: Option<clap_complete::Shell>,
+    /// Title
+    #[arg(short, long)]
+    title: Option<String>,
 }
 
 fn main() -> anyhow::Result<ExitCode> {
@@ -146,6 +149,9 @@ where
         write!(writer, "\x1B[2J\x1B[H").unwrap(); // clear
         #[cfg(debug_assertions)]
         write!(writer, "num lines: {num_lines:?} ").unwrap();
+        if let Some(title) = &opt.title {
+            writeln!(writer, "{}", title).unwrap();
+        }
         writeln!(writer, "· Elapsed time: {}", Format(start.elapsed())).unwrap();
         writeln!(writer, "╭─").unwrap();
         for line in output_lines.iter().take(num_lines) {
